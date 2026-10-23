@@ -1,0 +1,19 @@
+{
+	"schemaVersion": 1,
+	"id": "mc_sionna",
+	"version": "${version}",
+	"name": "mc-sionna",
+	"description": "Place radio transmitter and receiver blocks, trace radio paths through your world with NVIDIA Sionna RT, and see the rays in game.",
+	"authors": ["Samuel"],
+	"icon": "assets/mc_sionna/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": ["dev.mcsionna.McSionna"]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

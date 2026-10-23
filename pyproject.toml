@@ -1,0 +1,29 @@
+[project]
+name = "mc-sionna"
+version = "0.1.0"
+description = "Run Sionna RT on Minecraft worlds"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "sionna-rt>=2.2.0",
+]
+
+[project.scripts]
+mc-sionna-server = "mc_sionna.server:main"
+
+[build-system]
+requires = ["uv_build>=0.9.22,<0.10"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.2",
+    "ty>=0.0.91",
+]

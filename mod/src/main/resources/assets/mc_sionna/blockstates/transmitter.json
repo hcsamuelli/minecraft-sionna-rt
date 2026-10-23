@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "mc_sionna:block/transmitter" }
+  }
+}

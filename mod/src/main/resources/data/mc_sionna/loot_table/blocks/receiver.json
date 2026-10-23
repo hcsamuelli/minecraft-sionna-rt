@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "condition": { "type": "minecraft:survives_explosion" },
+      "entries": [ { "type": "minecraft:item", "name": "mc_sionna:receiver" } ],
+      "rolls": 1
+    }
+  ],
+  "random_sequence": "mc_sionna:blocks/receiver"
+}
