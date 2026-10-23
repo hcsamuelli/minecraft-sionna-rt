@@ -12,3 +12,7 @@ wheels/
 # local runs
 exports/
 .tools/
+
+# real server: world, logs, rcon password stay local
+server/*
+!server/start.sh
