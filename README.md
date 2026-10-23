@@ -12,7 +12,20 @@ Two parts:
 - `src/mc_sionna/`: Python service (Sionna RT 2.2, run with uv). It turns blocks into a scene, traces paths, and writes exports.
 - `mod/`: Fabric mod for Minecraft **26.3** (Java 25). It adds the two blocks and the `/sionna` command, and draws the rays.
 
-## Quick start
+Every command in one place: [COMMANDS.md](COMMANDS.md).
+
+## Join a server
+
+
+With [Prism Launcher](https://prismlauncher.org/) (it downloads Java for you):
+
+1. Add Instance → Minecraft **26.3**, Mod loader **Fabric**.
+2. Edit → Mods → Download mods → **Fabric API**.
+3. Add `mc-sionna-0.1.0.jar` from `server/mods/` on this machine (copy it with `scp`, see [COMMANDS.md](COMMANDS.md)).
+
+The server lives in `server/`. Start it with `server/start.sh` and the service with `uv run mc-sionna-server`, both inside `tmux` sessions. `server/` is in creative mode, with the allowlist off and Microsoft logins required. Its world, logs and settings stay out of git.
+
+## Run your own
 
 1. Start the Sionna service on a machine with an NVIDIA GPU:
 
