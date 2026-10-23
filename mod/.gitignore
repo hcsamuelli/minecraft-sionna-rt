@@ -30,7 +30,10 @@ bin/
 
 # fabric
 
-run/
+run/*
+!run/server.properties
+!run/eula.txt
+!run/options.txt
 
 # java
 

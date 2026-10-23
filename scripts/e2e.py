@@ -60,17 +60,42 @@ def main():
     rcon(f"setblock 10 {y + 2} 0 mc_sionna:receiver")
     rcon(f"setblock -4 {y + 1} 14 mc_sionna:receiver")
     rcon("sionna clear")
+
+    def wait(cond, secs=120):
+        for _ in range(secs):
+            time.sleep(1)
+            if cond():
+                return True
+        return False
+
+    def counts():
+        return count(rcon, "mc_sionna_ray"), count(rcon, "mc_sionna_label")
+
+    checks = {}
+    # 1. manual run
     rcon(f"execute positioned 0 {y + 2} 0 run sionna run")
-    for _ in range(120):
-        time.sleep(1)
-        if count(rcon, "mc_sionna_ray"):
-            break
-    rays, labels = count(rcon, "mc_sionna_ray"), count(rcon, "mc_sionna_label")
+    wait(lambda: counts()[0] > 0)
+    rays, labels = counts()
     new = sorted(set(exports.glob("*")) - before) if exports.exists() else []
-    print(f"rays={rays} labels={labels} new_exports={[p.name for p in new]}")
-    ok = rays > 0 and labels == 3 and new and (new[-1] / "scene.xml").exists() and (new[-1] / "channels.npz").exists()
-    print("E2E OK" if ok else "E2E FAILED")
-    sys.exit(0 if ok else 1)
+    checks["manual run draws rays + 3 labels + export"] = (
+        rays > 0 and labels == 3 and bool(new) and all((new[-1] / f).exists() for f in ("scene.xml", "channels.npz"))
+    )
+    # 2. placing a radio block re-runs on its own
+    rcon("sionna set auto_run true")
+    rcon(f"setblock -4 {y + 1} -14 mc_sionna:receiver")
+    checks["placing a receiver re-runs (4 labels)"] = wait(lambda: counts()[1] == 4)
+    # 3. breaking the only transmitter clears the drawing
+    rcon(f"setblock -10 {y + 2} 0 air")
+    checks["breaking the transmitter clears rays"] = wait(lambda: counts() == (0, 0))
+    # 4. the item is registered
+    checks["transmitter item exists"] = "Summoned" in rcon(
+        'summon item 0 -55 0 {Item:{id:"mc_sionna:transmitter",count:1}}'
+    )
+    rcon("kill @e[type=item]")
+    for name, ok in checks.items():
+        print(("PASS " if ok else "FAIL ") + name)
+    print("E2E OK" if all(checks.values()) else "E2E FAILED")
+    sys.exit(0 if all(checks.values()) else 1)
 
 
 if __name__ == "__main__":
