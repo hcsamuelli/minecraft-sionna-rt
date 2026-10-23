@@ -78,7 +78,6 @@ public class McSionna implements ModInitializer {
 					return 1;
 				}))
 				.then(Commands.literal("set")
-					.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
 					.then(Commands.argument("key", StringArgumentType.word())
 						.suggests((c, b) -> {
 							SETTINGS.keySet().forEach(b::suggest);
@@ -88,6 +87,11 @@ public class McSionna implements ModInitializer {
 							String key = StringArgumentType.getString(c, "key");
 							if (!SETTINGS.containsKey(key)) {
 								c.getSource().sendFailure(Component.literal("Unknown setting " + key + ", one of " + SETTINGS.keySet()));
+								return 0;
+							}
+							// anyone can tune the simulation, but only ops may point the server at another address
+							if (key.equals("url") && !Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(c.getSource())) {
+								c.getSource().sendFailure(Component.literal("Only ops can change url"));
 								return 0;
 							}
 							SETTINGS.put(key, StringArgumentType.getString(c, "value").trim());

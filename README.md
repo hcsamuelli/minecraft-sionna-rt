@@ -47,7 +47,7 @@ ssh -N -L 8765:127.0.0.1:8765 your-gpu-box
 | `/sionna run` | Trace paths for every transmitter and receiver within `radius` blocks of you |
 | `/sionna clear` | Remove all drawn rays and labels |
 | `/sionna settings` | Show the current settings |
-| `/sionna set <key> <value>` | Change a setting (needs op). Saved to `config/mc-sionna.properties` |
+| `/sionna set <key> <value>` | Change a setting (anyone can, except `url`, which needs op). Saved to `config/mc-sionna.properties` |
 
 Settings:
 
