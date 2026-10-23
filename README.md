@@ -96,12 +96,14 @@ Coordinates: the scene is z-up with the region's corner at the origin. A Minecra
   Blocks with no rule are treated as concrete and listed in a chat warning. Edit the table to change any of this.
 - **Treated as air:** leaves, flowers, grass, torches, fences, rails, and similar small blocks. Sionna can't model foliage as a lossy volume, and solid leaf cubes would make every tree a wall.
 - **Surfaces:** only block faces that touch air are kept, and neighboring faces of the same material are merged into big rectangles. Faces on the outer edge of the region are dropped, so the cut-off underground doesn't become a giant wall.
-- **Wall thickness:** Sionna sets a thickness per material, not per surface, so each material gets one copy per wall depth (`concrete-1`, `concrete-2`, ... up to 8 blocks). Each face carries half of `depth x thickness_per_block_m`, so a ray crossing the wall goes through the full amount. At the default 0.2 m per block, a 1-block wall acts like a normal 20 cm wall, and thicker walls lose more. Set it to `1.0` for true 1 m blocks, which makes almost every wall opaque. Glass is always 6 mm per face, like a real window.
+- **Wall thickness:** Sionna sets a thickness per material, not per surface, so each material gets one copy per wall depth (`concrete-1`, `concrete-2`, ...; exact up to 8 blocks, then rounded down to 16, 32 or 64). Each face carries half of `depth x thickness_per_block_m`, so a ray crossing the wall goes through the full amount. At the default 0.2 m per block, a 1-block wall acts like a normal 20 cm wall, and thicker walls lose more. Set it to `1.0` for true 1 m blocks, which makes almost every wall opaque. Glass is always 6 mm per face, like a real window. A wall made of layers of different blocks counts all its depth but only the materials of its two outer faces.
+- **Paths that bounce inside a wall are dropped.** Sionna sees a wall as two thin sheets with empty space between them, so on its own it finds rays that cross one face and then reflect off the wall's other faces from the inside. Those don't exist, so they are removed before anything is drawn or exported.
 - **Frequencies outside a material's ITU range** (the ground types only cover 1-10 GHz) use the closest ITU values and print a warning, instead of failing.
 
 ## Limits
 
 - **Drawing:** rays are drawn as `block_display` entities, so every player sees them, including players without the mod. A few thousand pieces is fine; tens of thousands will lag. Raise `max_drawn_paths` with care.
+- **Old drawings:** `/sionna clear` and new runs remove rays in loaded chunks. Rays saved in chunks that aren't loaded are thrown away when those chunks load, and drawings don't survive a server restart.
 - **Unloaded areas:** chunks that aren't loaded count as air, rather than making the server generate them.
 - **Diffraction:** when on, Sionna only finds edges where merged rectangles share corners exactly, and never between two different materials. Expect it to miss many building corners.
 - **Block shapes:** every block with collision counts as a full cube: slabs, stairs, panes, and doors.

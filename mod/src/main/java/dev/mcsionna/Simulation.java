@@ -15,8 +15,11 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import net.minecraft.ChatFormatting;
@@ -24,6 +27,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Brightness;
@@ -59,8 +63,9 @@ public final class Simulation {
 
 	static void autoRun(ServerLevel level, BlockPos pos) {
 		if (Boolean.parseBoolean(McSionna.SETTINGS.get("auto_run"))) {
-			// run after the block change that triggered us has finished
-			level.getServer().execute(() -> request(level, pos, null));
+			// schedule() always queues, so we run after the block change that triggered us has finished
+			MinecraftServer server = level.getServer();
+			server.schedule(server.wrapRunnable(() -> request(level, pos, null)));
 		}
 	}
 
@@ -110,6 +115,11 @@ public final class Simulation {
 		}
 		HTTP.sendAsync(req, HttpResponse.BodyHandlers.ofString()).whenComplete((resp, err) -> level.getServer().execute(() -> {
 			running = false;
+			if (!level.getServer().isSameThread()) {
+				// the server stopped while we waited, so execute() ran us on the HTTP thread
+				pending = null;
+				return;
+			}
 			try {
 				if (err != null) {
 					tell.accept(error("could not reach the Sionna service at " + url + " (is `uv run mc-sionna-server` running?): " + err));
@@ -133,8 +143,15 @@ public final class Simulation {
 		}));
 	}
 
+	/**
+	 * Ray and label entities from the latest drawing. Older ones still saved in unloaded chunks are
+	 * refused when those chunks load (see McSionna), so stale drawings never come back.
+	 */
+	static final Set<UUID> CURRENT = new HashSet<>();
+
 	/** Remove every ray and label entity in loaded chunks. */
 	static int clear(ServerLevel level) {
+		CURRENT.clear();
 		List<Entity> old = new ArrayList<>();
 		for (Entity e : level.getAllEntities()) {
 			if (e.entityTags().contains(RAY_TAG) || e.entityTags().contains(LABEL_TAG)) {
@@ -205,6 +222,7 @@ public final class Simulation {
 		e.setBrightnessOverride(new Brightness(15, 15));
 		e.setViewRange(4f);
 		e.addTag(RAY_TAG);
+		CURRENT.add(e.getUUID());
 		level.addFreshEntity(e);
 	}
 
@@ -214,6 +232,7 @@ public final class Simulation {
 		t.setText(Component.literal(text));
 		t.setBillboardConstraints(Display.BillboardConstraints.CENTER);
 		t.addTag(LABEL_TAG);
+		CURRENT.add(t.getUUID());
 		level.addFreshEntity(t);
 	}
 
@@ -245,7 +264,7 @@ public final class Simulation {
 			boolean[] loaded = new boolean[sx * sz];
 			for (int x = 0; x < sx; x++) {
 				for (int z = 0; z < sz; z++) {
-					loaded[x * sz + z] = level.hasChunk((x0 + x) >> 4, (z0 + z) >> 4);
+					loaded[x * sz + z] = level.getChunkSource().getChunkNow((x0 + x) >> 4, (z0 + z) >> 4) != null;
 				}
 			}
 			for (int x = 0; x < sx; x++) {
@@ -288,7 +307,7 @@ public final class Simulation {
 				if (k.equals("url") || k.equals("radius") || k.equals("auto_run")) {
 					return;
 				}
-				if (v.equals("true") || v.equals("false")) {
+				if (v.equalsIgnoreCase("true") || v.equalsIgnoreCase("false")) {
 					settings.addProperty(k, Boolean.parseBoolean(v));
 				} else {
 					try {

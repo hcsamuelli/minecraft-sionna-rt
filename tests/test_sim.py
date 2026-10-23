@@ -65,3 +65,34 @@ def test_simulate_end_to_end(tmp_path):
     assert (out / "channels.mat").exists()
     assert json.loads((out / "metadata.json").read_text())["origin_mc"] == [100, 60, -40]
     assert len(load_scene(str(out / "scene.xml")).objects) > 0
+
+
+def test_no_paths_bounce_inside_walls(tmp_path):
+    # 1-block stone wall in open air (no ground): only the straight crossing is real
+    sx, sy, sz = 30, 12, 30
+    g = np.zeros((sx, sy, sz), "<u2")
+    g[15, 1:10, 3:27] = 1
+    req = {
+        "origin": [0, 0, 0],
+        "size": [sx, sy, sz],
+        "palette": [
+            {"id": "minecraft:air", "collision": False, "water": False},
+            {"id": "minecraft:stone", "collision": True, "water": False},
+        ],
+        "blocks": base64.b64encode(g.tobytes()).decode(),
+        "transmitters": [{"pos": [5, 4, 14]}],
+        "receivers": [{"pos": [25, 4, 14]}],
+        "settings": {"max_depth": 4, "diffraction": "False"},  # string "False" must mean off
+    }
+    link = simulate(req, tmp_path / "wall")["links"][0]
+    assert link["num_paths"] == 1 and link["delay_spread_ns"] < 0.01
+
+
+def test_material_rules():
+    from mc_sionna.materials import material_for
+
+    assert material_for("minecraft:sea_lantern", True, False)[0] == "concrete"
+    assert material_for("minecraft:dried_kelp_block", True, False) == ("concrete", True)
+    assert material_for("minecraft:heavy_core", True, False)[0] == "metal"
+    assert material_for("minecraft:kelp", False, True)[0] == "water"
+    assert material_for("minecraft:oak_leaves", True, False)[0] is None

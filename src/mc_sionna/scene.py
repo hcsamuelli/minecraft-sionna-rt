@@ -52,8 +52,8 @@ def _runs(faces: np.ndarray) -> np.ndarray:
 _PLANES = {0: (1, 2, True), 1: (0, 2, False), 2: (0, 1, True)}
 
 
-MAX_DEPTH = 8  # walls deeper than this many blocks all get the same (already opaque) thickness
-_KEY = 16  # face key = material * _KEY + depth
+MAX_DEPTH = 64  # walls deeper than this count as 64 blocks
+_KEY = 128  # face key = material * _KEY + depth
 
 
 def _depth(solid: np.ndarray, forward: bool) -> np.ndarray:
@@ -63,7 +63,9 @@ def _depth(solid: np.ndarray, forward: bool) -> np.ndarray:
     for i in range(len(solid) - 1, -1, -1) if forward else range(len(solid)):
         run = np.where(solid[i], run + 1, 0)
         d[i] = run
-    return np.minimum(d, MAX_DEPTH)
+    d = np.minimum(d, MAX_DEPTH)
+    # past 8 blocks, round down to a power of two so terrain doesn't make dozens of material copies
+    return np.where(d > 8, 2 ** np.floor(np.log2(np.maximum(d, 1))).astype(np.int32), d)
 
 
 def mesh_blocks(mat: np.ndarray) -> dict[tuple[int, int], np.ndarray]:

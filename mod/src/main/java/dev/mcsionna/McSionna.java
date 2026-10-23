@@ -12,6 +12,7 @@ import java.util.Properties;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -55,6 +56,8 @@ public class McSionna implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		loadSettings();
+		ServerEntityEvents.ALLOW_LOAD.register((entity, level, reason, flag) -> Simulation.CURRENT.contains(entity.getUUID())
+			|| !(entity.entityTags().contains(Simulation.RAY_TAG) || entity.entityTags().contains(Simulation.LABEL_TAG)));
 		CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.FUNCTIONAL_BLOCKS).register(out -> {
 			out.accept(TRANSMITTER);
 			out.accept(RECEIVER);

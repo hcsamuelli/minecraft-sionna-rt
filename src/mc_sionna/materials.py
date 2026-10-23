@@ -16,17 +16,17 @@ RULES: list[tuple[str, str | None]] = [
     # things that are mostly air or too small to matter at radio wavelengths
     (
         r"leaves|sapling|flower|tulip|orchid|allium|bluet|daisy|poppy|dandelion|lilac|peony|rose_bush"
-        r"|short_grass|tall_grass|fern|dead_bush|vine|lichen|torch|lantern|candle|rail|button"
+        r"|short_grass|tall_grass|fern|dead_bush|vine|lichen|torch|(?<!sea_)lantern|candle|rail|button"
         r"|pressure_plate|sign|banner|carpet|ladder|lever|tripwire|string|cobweb|^fire$|soul_fire|redstone_wire"
-        r"|repeater|comparator|sugar_cane|bamboo$|kelp|seagrass|sea_pickle|coral(?!_block)|mushroom$"
-        r"|wheat|carrots|potatoes|beetroots|melon_stem|pumpkin_stem|sweet_berry|cocoa|nether_wart|^snow$|scaffolding"
+        r"|repeater|comparator|sugar_cane|bamboo$|kelp(?!_block)|seagrass|sea_pickle|coral(?!_block)|mushroom$"
+        r"|wheat|carrots|potatoes|beetroots|melon_stem|pumpkin_stem|sweet_berry|cocoa|nether_wart(?!_block)|^snow$|scaffolding"
         r"|flower_pot|head|skull|end_rod|lightning_rod|chain$|bars$|pointed_dripstone|amethyst_cluster"
         r"|_bud$|moss_carpet|hanging_roots|spore_blossom|glow_lichen|frogspawn|lily_pad|azalea$"
         r"|fence(?!_gate)|_fence_gate",
         None,
     ),
     # ores are mostly rock
-    (r"ore$", "concrete"),
+    (r"_ore$", "concrete"),
     # metal
     (
         r"iron_|gold_block|copper|netherite_block|anvil|cauldron|hopper|heavy_core|raw_iron_block"
@@ -61,7 +61,7 @@ RULES: list[tuple[str, str | None]] = [
     (
         r"stone|cobble|deepslate|andesite|diorite|granite|tuff|basalt|blackstone|concrete|terracotta"
         r"|obsidian|bedrock|prismarine|purpur|netherrack|end_stone|dripstone_block|magma|sandstone"
-        r"|ore$|furnace|smoker",
+        r"|_ore$|furnace|smoker",
         "concrete",
     ),
 ]
@@ -90,7 +90,8 @@ def material_for(block_id: str, has_collision: bool, is_water: bool) -> tuple[st
     path = block_id.split(":", 1)[-1]
     for pattern, material in _COMPILED:
         if pattern.search(path):
-            return material, False
+            # kelp, seagrass, waterlogged fences etc. are still water, not air pockets
+            return ("water" if material is None and is_water else material), False
     if is_water:
         return "water", False
     return (DEFAULT_SOLID, True) if has_collision else (None, False)

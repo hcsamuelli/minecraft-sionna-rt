@@ -30,6 +30,31 @@ DEFAULTS = {
 _INTERACTIONS = {1: "reflection", 2: "diffuse", 4: "refraction", 8: "diffraction"}
 
 
+def _flag(v) -> bool:
+    return v if isinstance(v, bool) else str(v).strip().lower() in ("true", "1", "yes", "on")
+
+
+def _bounces_inside_solid(mat: np.ndarray, start: np.ndarray, verts: np.ndarray, inter: np.ndarray) -> bool:
+    """True if the path reflects off a face from inside a solid block.
+
+    Sionna sees a wall as two thin sheets with empty space between them, so a ray that
+    crossed one face can bounce off the wall's other faces from the inside. Those paths
+    don't exist in reality. start: tx in Minecraft coords relative to the region origin;
+    verts/inter: this path's bounce points (scene coords) and interaction types.
+    """
+    prev = start
+    for v, kind in zip(verts, inter, strict=True):
+        if kind == 0:
+            break
+        v = scene_to_mc(v)
+        if kind & 3:  # specular or diffuse reflection
+            i = np.floor((prev + v) / 2).astype(int)
+            if np.all(i >= 0) and np.all(i < mat.shape) and mat[tuple(i)] > 0:
+                return True
+        prev = v
+    return False
+
+
 def simulate(req: dict, out_dir: Path) -> dict:
     t0 = time.perf_counter()
     s = DEFAULTS | req.get("settings", {})
@@ -68,7 +93,7 @@ def simulate(req: dict, out_dir: Path) -> dict:
     # Diffraction needs shared mesh edges, so weld coincident corners when it's on.
     # ponytail: merged rectangles still leave T-junctions where no edge is found; split faces
     # at every block corner if diffraction ever matters.
-    scene = load_scene(str(xml_path), merge_shapes=False, remove_duplicate_vertices=bool(s["diffraction"]))
+    scene = load_scene(str(xml_path), merge_shapes=False, remove_duplicate_vertices=_flag(s["diffraction"]))
     scene.frequency = freq
     scene.tx_array = PlanarArray(num_rows=1, num_cols=1, pattern="iso", polarization="V")
     scene.rx_array = PlanarArray(num_rows=1, num_cols=1, pattern="iso", polarization="V")
@@ -83,9 +108,9 @@ def simulate(req: dict, out_dir: Path) -> dict:
         max_depth=int(s["max_depth"]),
         los=True,
         specular_reflection=True,
-        diffuse_reflection=bool(s["diffuse"]),
-        refraction=bool(s["refraction"]),
-        diffraction=bool(s["diffraction"]),
+        diffuse_reflection=_flag(s["diffuse"]),
+        refraction=_flag(s["refraction"]),
+        diffraction=_flag(s["diffraction"]),
         synthetic_array=True,
     )
     solve_s = time.perf_counter() - t_solve
@@ -95,12 +120,16 @@ def simulate(req: dict, out_dir: Path) -> dict:
     a, tau = paths.cir(normalize_delays=False, out_type="numpy")
     a = a[:, 0, :, 0, :, 0]
     valid = np.array(paths.valid, dtype=bool)
-    a = np.where(valid, a, 0)
     verts = np.array(paths.vertices)
     inter = np.array(paths.interactions)
+    for r, t, k in np.argwhere(valid):
+        if _bounces_inside_solid(mat, tx_mc[t] - origin, verts[:, r, t, k], inter[:, r, t, k]):
+            valid[r, t, k] = False
+    a = np.where(valid, a, 0)
     n_sc = int(s["num_subcarriers"])
-    freqs = subcarrier_frequencies(n_sc, s["bandwidth_mhz"] * 1e6 / n_sc)
-    h = paths.cfr(frequencies=freqs, normalize_delays=False, out_type="numpy")[:, 0, :, 0, 0, :]
+    freqs = np.array(subcarrier_frequencies(n_sc, s["bandwidth_mhz"] * 1e6 / n_sc), np.float64)
+    # same formula as Sionna's Paths.cfr, done here so the dropped paths stay dropped
+    h = (a[..., None] * np.exp(-2j * np.pi * freqs * np.where(valid, tau, 0)[..., None])).sum(axis=2)
 
     gain = np.abs(a) ** 2
     links = []
@@ -144,7 +173,7 @@ def simulate(req: dict, out_dir: Path) -> dict:
         "tau": tau.astype(np.float32),
         "valid": valid,
         "h_freq": h.astype(np.complex64),
-        "subcarrier_offsets_hz": np.array(freqs, np.float64),
+        "subcarrier_offsets_hz": freqs,
         "frequency_hz": np.float64(freq),
         "vertices": verts.astype(np.float32),
         "interactions": inter.astype(np.uint32),
