@@ -77,3 +77,14 @@ publishing {
 		// retrieving dependencies.
 	}
 }
+
+// The dev server rewrites run/server.properties with every default (including a generated
+// secret), so keep our settings in a tracked template and copy it in before each start.
+def devServerProps = file("dev-server.properties")
+def runServerProps = file("run/server.properties")
+tasks.named("runServer") {
+	doFirst {
+		runServerProps.parentFile.mkdirs()
+		java.nio.file.Files.copy(devServerProps.toPath(), runServerProps.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+	}
+}

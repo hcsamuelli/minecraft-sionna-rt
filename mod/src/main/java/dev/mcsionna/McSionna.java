@@ -13,6 +13,8 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -56,8 +58,11 @@ public class McSionna implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		loadSettings();
-		ServerEntityEvents.ALLOW_LOAD.register((entity, level, reason, flag) -> Simulation.CURRENT.contains(entity.getUUID())
+		ServerTickEvents.END_SERVER_TICK.register(server -> Simulation.tick());
+		ServerEntityEvents.ALLOW_LOAD.register((entity, level, reason, flag) -> Simulation.RAYS.contains(entity)
+			|| Simulation.LABELS.contains(entity)
 			|| !(entity.entityTags().contains(Simulation.RAY_TAG) || entity.entityTags().contains(Simulation.LABEL_TAG)));
+		ServerLifecycleEvents.SERVER_STOPPED.register(server -> Simulation.reset());
 		CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.FUNCTIONAL_BLOCKS).register(out -> {
 			out.accept(TRANSMITTER);
 			out.accept(RECEIVER);
@@ -65,11 +70,12 @@ public class McSionna implements ModInitializer {
 		CommandRegistrationCallback.EVENT.register((dispatcher, context, selection) -> dispatcher.register(
 			Commands.literal("sionna")
 				.then(Commands.literal("run").executes(c -> {
-					Simulation.request(c.getSource().getLevel(), BlockPos.containing(c.getSource().getPosition()), c.getSource());
+					Simulation.request(c.getSource().getLevel(), BlockPos.containing(c.getSource().getPosition()), c.getSource(), true);
 					return 1;
 				}))
 				.then(Commands.literal("clear").executes(c -> {
 					int n = Simulation.clear(c.getSource().getLevel());
+					Simulation.stopLive();
 					c.getSource().sendSuccess(() -> Component.literal("Removed " + n + " ray/label entities"), false);
 					return n;
 				}))

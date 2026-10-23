@@ -6,6 +6,7 @@ and checks that the mod drew rays and the Python service wrote an export.
     uv run python scripts/e2e.py
 """
 
+import os
 import socket
 import struct
 import sys
@@ -45,6 +46,8 @@ def count(rcon: Rcon, tag: str) -> int:
 def main():
     rcon = Rcon()
     exports = Path("exports")
+    # the Sionna service's log (COMMANDS.md starts it with `tee -a server/sionna-service.log`)
+    service_log = Path(os.environ.get("MC_SIONNA_SERVICE_LOG", "server/sionna-service.log"))
     before = set(exports.glob("*")) if exports.exists() else set()
     y = -60  # superflat ground surface is at y=-61
     rcon("forceload add -40 -40 40 40")
@@ -84,10 +87,36 @@ def main():
     rcon("sionna set auto_run true")
     rcon(f"setblock -4 {y + 1} -14 mc_sionna:receiver")
     checks["placing a receiver re-runs (4 labels)"] = wait(lambda: counts()[1] == 4)
-    # 3. breaking the only transmitter clears the drawing
+
+    # 3. live mode: block edits near the radios re-run without exporting, radio moves reuse the scene
+    def live_lines():
+        return [ln for ln in service_log.read_text().splitlines() if "simulated" in ln and "no export" in ln]
+
+    exported = len(list(exports.glob("*")))
+    n = len(live_lines())
+    rcon(f"setblock -5 {y + 1} -5 stone")
+    checks["a block edit re-runs live"] = wait(lambda: len(live_lines()) > n, 10) and counts()[1] == 4
+    n = len(live_lines())
+    rcon(f"setblock -4 {y + 1} -14 air")
+    rcon(f"setblock -4 {y + 1} -12 mc_sionna:receiver")
+    wait(lambda: len(live_lines()) > n, 10)
+    time.sleep(1.5)
+    checks["moving a receiver reuses the loaded scene"] = any("scene reused" in ln for ln in live_lines()[n:])
+    rays_before = counts()[0]
+    n = len(live_lines())
+    for i in range(20):  # 20 edits in 2 s: at most ~2 runs a second should follow
+        rcon(f"setblock 5 {y + 1} 5 {'stone' if i % 2 == 0 else 'air'}")
+        time.sleep(0.1)
+    time.sleep(1.5)
+    runs = len(live_lines()) - n
+    print(f"  {runs} live runs for 20 block edits")
+    checks["live runs are throttled to ~2 per second"] = 1 <= runs <= 8
+    checks["live runs reuse ray entities instead of adding more"] = counts() == (rays_before, 4)
+    checks["live runs write no exports"] = len(list(exports.glob("*"))) == exported
+    # 4. breaking the only transmitter clears the drawing
     rcon(f"setblock -10 {y + 2} 0 air")
     checks["breaking the transmitter clears rays"] = wait(lambda: counts() == (0, 0))
-    # 4. the item is registered
+    # 5. the item is registered
     checks["transmitter item exists"] = "Summoned" in rcon(
         'summon item 0 -55 0 {Item:{id:"mc_sionna:transmitter",count:1}}'
     )

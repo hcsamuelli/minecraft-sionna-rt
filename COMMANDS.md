@@ -14,12 +14,12 @@ Every command you need, grouped by where you type it. See [README.md](README.md)
 |---|---|
 | `/give @s mc_sionna:transmitter` | Get a Radio Transmitter block. Both blocks are also in the Functional Blocks creative tab |
 | `/give @s mc_sionna:receiver` | Get a Radio Receiver block |
-| `/sionna run` | Trace paths for every transmitter and receiver within `radius` blocks of you |
+| `/sionna run` | Trace paths for every transmitter and receiver within `radius` blocks of you, and save the scene + channels |
 | `/sionna clear` | Remove all drawn rays and labels |
 | `/sionna settings` | Show the current settings |
 | `/sionna set <key> <value>` | Change a setting. Anyone can, except `url`, which needs op |
 
-Placing or breaking a radio block re-runs the simulation on its own (turn that off with `/sionna set auto_run false`).
+The rays update live (at most twice a second) when radio blocks are placed or broken, or blocks near them change. Live updates save nothing; `/sionna run` saves. Turn live updates off with `/sionna set auto_run false`.
 
 Useful settings:
 
@@ -40,7 +40,7 @@ Both programs run in `tmux` sessions, so they keep going after you log out.
 
 | Command | What it does |
 |---|---|
-| `tmux new-session -d -s sionna "uv run mc-sionna-server"` | Start the Sionna service (port 8765, this machine only) |
+| `tmux new-session -d -s sionna "uv run mc-sionna-server 2>&1 \| tee -a server/sionna-service.log"` | Start the Sionna service (port 8765, this machine only), logging to `server/sionna-service.log` |
 | `tmux new-session -d -s mc ./server/start.sh` | Start the Minecraft server (port 25565) |
 | `tmux ls` | See what's running |
 | `tmux attach -t mc` | Open the server console to type commands. Leave it running with Ctrl-b then d |
@@ -66,7 +66,7 @@ sudo firewall-cmd --add-port=25565/tcp --permanent && sudo firewall-cmd --reload
 
 ## Exports
 
-Each run writes `exports/<timestamp>/`, holding `scene.xml` + `meshes/`, `channels.npz`, `channels.mat`, `paths.json` and `metadata.json`.
+Each `/sionna run` writes `exports/<timestamp>/`, holding `scene.xml` + `meshes/`, `channels.npz`, `channels.mat`, `paths.json` and `metadata.json`.
 
 ```bash
 ls -t exports | head
@@ -86,5 +86,5 @@ uv run python -c "from sionna.rt import load_scene; s = load_scene('exports/<tim
 | `uv run ruff check && uv run ty check src` | Lint and type check |
 | `cd mod && JAVA_HOME=../.tools/jdk-25.0.5+8 ./gradlew build` | Build the mod jar into `mod/build/libs/` |
 | `cp mod/build/libs/mc-sionna-0.1.0.jar server/mods/` | Put a new build on a server, then restart it |
-| `cd mod && JAVA_HOME=../.tools/jdk-25.0.5+8 ./gradlew runServer --args=nogui` | Offline test server (flat world, remote console on). Stop a server first: both use port 25565 |
+| `cd mod && JAVA_HOME=../.tools/jdk-25.0.5+8 ./gradlew runServer --args=nogui` | Offline test server on port 25566 (flat world, remote console on) |
 | `uv run python scripts/e2e.py` | End-to-end test against that test server |

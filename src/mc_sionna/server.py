@@ -24,9 +24,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, {"ok": False, "error": "not found"})
         try:
             req = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            out = self.exports / datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
+            # live updates send export=false: trace only, write nothing
+            out = self.exports / datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f") if req.get("export", True) else None
             result = simulate(req, out)
-            self.log_message("simulated %s in %.2fs -> %s", req["size"], result["elapsed_s"], out)
+            self.log_message(
+                "simulated %s in %.2fs%s -> %s",
+                req["size"],
+                result["elapsed_s"],
+                " (scene reused)" if result["scene_reused"] else "",
+                out or "no export",
+            )
             self._send(200, {"ok": True} | result)
         except Exception as e:
             traceback.print_exc()

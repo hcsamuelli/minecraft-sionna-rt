@@ -2,6 +2,7 @@ import base64
 import json
 
 import numpy as np
+import pytest
 from sionna.rt import load_scene
 
 from mc_sionna.scene import mesh_blocks
@@ -96,3 +97,19 @@ def test_material_rules():
     assert material_for("minecraft:heavy_core", True, False)[0] == "metal"
     assert material_for("minecraft:kelp", False, True)[0] == "water"
     assert material_for("minecraft:oak_leaves", True, False)[0] is None
+
+
+def test_live_runs_reuse_scene_when_only_radios_move(tmp_path):
+    from mc_sionna import sim
+
+    sim._cached.clear()
+    world = _world()
+    first = simulate(world, None)
+    assert not first["scene_reused"] and first["export_dir"] is None
+    world["receivers"] = [{"pos": [125, 63, -24]}, {"pos": [110, 63, -10]}]  # radios moved, blocks didn't
+    live = simulate(world, None)
+    assert live["scene_reused"]
+    fresh = simulate(world, tmp_path / "fresh")  # exports always rebuild
+    assert not fresh["scene_reused"]
+    assert [link["gain_db"] for link in live["links"]] == pytest.approx([link["gain_db"] for link in fresh["links"]])
+    assert list(tmp_path.iterdir()) == [tmp_path / "fresh"]  # live runs wrote nothing

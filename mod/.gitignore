@@ -31,7 +31,6 @@ bin/
 # fabric
 
 run/*
-!run/server.properties
 !run/eula.txt
 !run/options.txt
 

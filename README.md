@@ -29,7 +29,7 @@ The server lives in `server/`. Start it with `server/start.sh` and the service w
    uv run mc-sionna-server
    ```
 
-   It listens on `127.0.0.1:8765` and writes each run to `exports/<timestamp>/`.
+   It listens on `127.0.0.1:8765`. Each `/sionna run` is saved to `exports/<timestamp>/`.
 
 2. Build the mod (or use the jar in `mod/build/libs/`):
 
@@ -39,7 +39,7 @@ The server lives in `server/`. Start it with `server/start.sh` and the service w
 
 3. Install it like any Fabric mod: Minecraft **26.3** + Fabric, with [Fabric API](https://modrinth.com/mod/fabric-api) and `mod/build/libs/mc-sionna-0.1.0.jar`.
 
-4. In a world (creative mode is easiest), find **Radio Transmitter** and **Radio Receiver** in the Functional Blocks tab, or run `/give @s mc_sionna:transmitter`. Place one of each. The simulation runs on its own each time a radio block is placed or broken. Run `/sionna run` to trace again after you change the world.
+4. In a world (creative mode is easiest), find **Radio Transmitter** and **Radio Receiver** in the Functional Blocks tab, or run `/give @s mc_sionna:transmitter`. Place one of each. The rays update live: when a radio block is placed or broken, and when any block changes near the radios (at most twice a second). Run `/sionna run` to save the scene and channels.
 
 **If Minecraft runs on a different computer than the GPU** (for example a laptop, with the GPU box reached over SSH), forward the port. The mod's default address then works as is:
 
@@ -51,7 +51,7 @@ ssh -N -L 8765:127.0.0.1:8765 your-gpu-box
 
 | Command | What it does |
 |---|---|
-| `/sionna run` | Trace paths for every transmitter and receiver within `radius` blocks of you |
+| `/sionna run` | Trace paths for every transmitter and receiver within `radius` blocks of you, and save the scene + channels |
 | `/sionna clear` | Remove all drawn rays and labels |
 | `/sionna settings` | Show the current settings |
 | `/sionna set <key> <value>` | Change a setting (anyone can, except `url`, which needs op). Saved to `config/mc-sionna.properties` |
@@ -62,7 +62,7 @@ Settings:
 |---|---|---|
 | `url` | `http://127.0.0.1:8765` | Where the Python service is |
 | `radius` | `48` | Half-size of the cube of blocks sent to Sionna (max 128) |
-| `auto_run` | `true` | Re-run when a radio block is placed or broken |
+| `auto_run` | `true` | Live updates: re-run (without saving) when a radio block is placed or broken, or a block changes near the radios |
 | `frequency_ghz` | `3.5` | Carrier frequency |
 | `max_depth` | `4` | Max interactions per path. Each wall crossing uses two, one for each face |
 | `max_drawn_paths` | `100` | How many of the strongest paths get drawn (all paths are still exported) |
@@ -73,7 +73,7 @@ Ray colors go by power: **red** is the strongest path, then orange, yellow, lime
 
 ## What gets saved
 
-Each run makes `exports/<timestamp>/` with:
+Each `/sionna run` makes `exports/<timestamp>/` with (live updates save nothing):
 
 - `scene.xml` plus `meshes/*.ply`: the exact scene that was simulated. It loads on its own with `sionna.rt.load_scene("scene.xml")`.
 - `channels.npz` and `channels.mat` (same contents, `.mat` for MATLAB):
@@ -114,7 +114,8 @@ Coordinates: the scene is z-up with the region's corner at the origin. A Minecra
 - **Unloaded areas:** chunks that aren't loaded count as air, rather than making the server generate them.
 - **Diffraction:** when on, Sionna only finds edges where merged rectangles share corners exactly, and never between two different materials. Expect it to miss many building corners.
 - **Block shapes:** every block with collision counts as a full cube: slabs, stairs, panes, and doors.
-- **One request at a time:** the service handles one request at a time. The mod runs the latest request when the current one finishes.
+- **One request at a time:** the service handles one request at a time. The mod runs the latest request when the current one finishes (a pending `/sionna run` is never dropped).
+- **Live update speed:** moving or adding radios reuses the loaded scene (about 0.01 s). Changing blocks makes Sionna load a new scene and recompile its GPU code: about 0.5 s on a small area, a few seconds on a full-size one.
 
 ## Development
 
@@ -131,7 +132,7 @@ To test the whole thing against a real server:
    uv run mc-sionna-server
    ```
 
-2. Start the dev server. Its settings in `mod/run/server.properties` allow offline players and turn on the remote console port:
+2. Start the dev server on port 25566. Its settings come from `mod/dev-server.properties` (offline players, remote console on), copied into `mod/run/` on each start:
 
    ```bash
    cd mod && JAVA_HOME=../.tools/jdk-25.0.5+8 ./gradlew runServer --args=nogui
@@ -143,6 +144,6 @@ To test the whole thing against a real server:
    uv run python scripts/e2e.py
    ```
 
-`./gradlew runClient` starts a dev client (offline player name) that can join `127.0.0.1:25565`.
+`./gradlew runClient` starts a dev client (offline player name) that can join `127.0.0.1:25566`.
 
 JDK 25 is unpacked in `.tools/`. It's ignored by git; download Temurin 25 again if it's missing.

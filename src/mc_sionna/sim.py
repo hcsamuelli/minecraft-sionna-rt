@@ -1,7 +1,9 @@
 """Run Sionna RT on a block grid sent by the mod, and export everything."""
 
 import base64
+import hashlib
 import json
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -55,7 +57,39 @@ def _bounces_inside_solid(mat: np.ndarray, start: np.ndarray, verts: np.ndarray,
     return False
 
 
-def simulate(req: dict, out_dir: Path) -> dict:
+# The last scene loaded into Sionna, so live updates where only the radios moved skip the rebuild.
+_cached: dict[str, Any] = {}
+
+
+def _scene_for(mat: np.ndarray, names: list[str], origin: np.ndarray, freq: float, s: dict, out_dir: Path | None):
+    """(scene, triangles, warnings, reused) for this block grid.
+
+    Reuses the last scene when the materials, region and settings that shape the geometry are
+    unchanged and nothing needs exporting. Otherwise writes PLY + XML (to out_dir, or a temp
+    folder that's deleted once Sionna has read it) and loads that.
+    """
+    thickness, diffraction = float(s["thickness_per_block_m"]), _flag(s["diffraction"])
+    key = hashlib.sha1(
+        mat.tobytes() + repr((mat.shape, names, origin.tolist(), freq, thickness, diffraction)).encode()
+    ).hexdigest()
+    if out_dir is None and _cached.get("key") == key:
+        return _cached["scene"], _cached["triangles"], _cached["warnings"], True
+    with tempfile.TemporaryDirectory(prefix="mc-sionna-") as tmp:
+        folder = out_dir if out_dir is not None else Path(tmp)
+        folder.mkdir(parents=True, exist_ok=True)
+        xml_path, triangles, warnings = write_scene(folder, mat, names, freq, thickness)
+        # Diffraction needs shared mesh edges, so weld coincident corners when it's on.
+        # ponytail: merged rectangles still leave T-junctions where no edge is found; split faces
+        # at every block corner if diffraction ever matters.
+        scene = load_scene(str(xml_path), merge_shapes=False, remove_duplicate_vertices=diffraction)
+    scene.tx_array = PlanarArray(num_rows=1, num_cols=1, pattern="iso", polarization="V")
+    scene.rx_array = PlanarArray(num_rows=1, num_cols=1, pattern="iso", polarization="V")
+    _cached.update(key=key, scene=scene, triangles=triangles, warnings=warnings)
+    return scene, triangles, warnings, False
+
+
+def simulate(req: dict, out_dir: Path | None) -> dict:
+    """Trace paths for one snapshot of the world. Writes scene + channel files only if out_dir is given."""
     t0 = time.perf_counter()
     s = DEFAULTS | req.get("settings", {})
     origin = np.array(req["origin"], dtype=np.int64)
@@ -79,8 +113,8 @@ def simulate(req: dict, out_dir: Path) -> dict:
     mat = lut[blocks]
 
     freq = s["frequency_ghz"] * 1e9
-    out_dir.mkdir(parents=True, exist_ok=True)
-    xml_path, triangles, warnings = write_scene(out_dir, mat, names, freq, float(s["thickness_per_block_m"]))
+    scene, triangles, warnings, reused = _scene_for(mat, names, origin, freq, s, out_dir)
+    warnings = list(warnings)
     if guessed:
         warnings.append(f"no material rule for {', '.join(sorted(guessed))}; treated as concrete")
 
@@ -90,13 +124,8 @@ def simulate(req: dict, out_dir: Path) -> dict:
     tx_sc = mc_to_scene(tx_mc - origin)
     rx_sc = mc_to_scene(rx_mc - origin)
 
-    # Diffraction needs shared mesh edges, so weld coincident corners when it's on.
-    # ponytail: merged rectangles still leave T-junctions where no edge is found; split faces
-    # at every block corner if diffraction ever matters.
-    scene = load_scene(str(xml_path), merge_shapes=False, remove_duplicate_vertices=_flag(s["diffraction"]))
     scene.frequency = freq
-    scene.tx_array = PlanarArray(num_rows=1, num_cols=1, pattern="iso", polarization="V")
-    scene.rx_array = PlanarArray(num_rows=1, num_cols=1, pattern="iso", polarization="V")
+    scene.remove(list(scene.transmitters) + list(scene.receivers))
     for i, p in enumerate(tx_sc):
         scene.add(Transmitter(f"tx{i}", position=p.tolist()))
     for i, p in enumerate(rx_sc):
@@ -181,11 +210,9 @@ def simulate(req: dict, out_dir: Path) -> dict:
         "rx_positions": rx_sc,
         "origin_mc": origin,
     }
-    np.savez_compressed(out_dir / "channels.npz", **export)
-    scipy.io.savemat(out_dir / "channels.mat", export, do_compression=True)
-
     summary = {
-        "export_dir": str(out_dir.resolve()),
+        "export_dir": str(out_dir.resolve()) if out_dir is not None else None,
+        "scene_reused": reused,
         "elapsed_s": round(time.perf_counter() - t0, 3),
         "solve_s": round(solve_s, 3),
         "triangles": triangles,
@@ -193,6 +220,10 @@ def simulate(req: dict, out_dir: Path) -> dict:
         "links": links,
         "warnings": warnings,
     }
+    if out_dir is None:
+        return summary | {"paths": drawn}
+    np.savez_compressed(out_dir / "channels.npz", **export)
+    scipy.io.savemat(out_dir / "channels.mat", export, do_compression=True)
     (out_dir / "metadata.json").write_text(
         json.dumps(
             {
