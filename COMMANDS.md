@@ -2,11 +2,7 @@
 
 Every command you need, grouped by where you type it. See [README.md](README.md) for how it all works.
 
-## Join a server
-
-
-```bash
-```
+Players need Minecraft **26.3** + Fabric, with Fabric API and `mc-sionna-0.1.0.jar`.
 
 ## In game
 
@@ -85,6 +81,6 @@ uv run python -c "from sionna.rt import load_scene; s = load_scene('exports/<tim
 | `uv run pytest` | Python tests (meshing and a full Sionna run on a small fake world) |
 | `uv run ruff check && uv run ty check src` | Lint and type check |
 | `cd mod && JAVA_HOME=../.tools/jdk-25.0.5+8 ./gradlew build` | Build the mod jar into `mod/build/libs/` |
-| `cp mod/build/libs/mc-sionna-0.1.0.jar server/mods/` | Put a new build on a server, then restart it |
+| `cp mod/build/libs/mc-sionna-0.1.0.jar server/mods/` | Put a new build on the server, then restart it |
 | `cd mod && JAVA_HOME=../.tools/jdk-25.0.5+8 ./gradlew runServer --args=nogui` | Offline test server on port 25566 (flat world, remote console on) |
 | `uv run python scripts/e2e.py` | End-to-end test against that test server |

@@ -14,14 +14,7 @@ Two parts:
 
 Every command in one place: [COMMANDS.md](COMMANDS.md).
 
-## Join a server
-
-
-Client: Minecraft **26.3** + Fabric, with [Fabric API](https://modrinth.com/mod/fabric-api) and `mc-sionna-0.1.0.jar` (from `server/mods/`).
-
-The server lives in `server/`. Start it with `server/start.sh` and the service with `uv run mc-sionna-server`, both inside `tmux` sessions. `server/` is in creative mode, with the allowlist off and Microsoft logins required. Its world, logs and settings stay out of git.
-
-## Run your own
+## Setup
 
 1. Start the Sionna service on a machine with an NVIDIA GPU:
 
@@ -115,7 +108,7 @@ Coordinates: the scene is z-up with the region's corner at the origin. A Minecra
 - **Diffraction:** when on, Sionna only finds edges where merged rectangles share corners exactly, and never between two different materials. Expect it to miss many building corners.
 - **Block shapes:** every block with collision counts as a full cube: slabs, stairs, panes, and doors.
 - **One request at a time:** the service handles one request at a time. The mod runs the latest request when the current one finishes (a pending `/sionna run` is never dropped).
-- **Live update speed:** moving or adding radios reuses the loaded scene (about 0.01 s). Changing blocks makes Sionna load a new scene and recompile its GPU code: about 0.5 s on a small area, a few seconds on a full-size one.
+- **Live update speed:** most updates take about 0.01 s. When a change brings in a material or wall depth the scene didn't have yet, Sionna recompiles its GPU code: about 0.5 s on a small area, a few seconds on a full-size one.
 
 ## Development
 
