@@ -2,18 +2,11 @@
 
 Every command you need, grouped by where you type it. See [README.md](README.md) for how it all works.
 
-## Join a server (your computer, Prism Launcher)
+## Join a server
 
 
-1. In Prism, click **Add Instance**, pick Minecraft **26.3**, set Mod loader to **Fabric**, and click OK. Prism downloads Java 25 on its own. If it asks, open the instance's Edit → Settings → Java and click Download Java.
-2. Right-click the instance → Edit → Mods → **Download mods**, search for "Fabric API", select it, and click OK.
-3. Copy the radio mod to your computer:
-
-   ```bash
-   ```
-
-   Drag the file onto the instance's Mods page, or use **Add file**.
-4. Launch the instance, go to Multiplayer → Add Server, and enter the address.
+```bash
+```
 
 ## In game
 

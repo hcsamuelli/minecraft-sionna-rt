@@ -17,11 +17,7 @@ Every command in one place: [COMMANDS.md](COMMANDS.md).
 ## Join a server
 
 
-With [Prism Launcher](https://prismlauncher.org/) (it downloads Java for you):
-
-1. Add Instance → Minecraft **26.3**, Mod loader **Fabric**.
-2. Edit → Mods → Download mods → **Fabric API**.
-3. Add `mc-sionna-0.1.0.jar` from `server/mods/` on this machine (copy it with `scp`, see [COMMANDS.md](COMMANDS.md)).
+Client: Minecraft **26.3** + Fabric, with [Fabric API](https://modrinth.com/mod/fabric-api) and `mc-sionna-0.1.0.jar` (from `server/mods/`).
 
 The server lives in `server/`. Start it with `server/start.sh` and the service with `uv run mc-sionna-server`, both inside `tmux` sessions. `server/` is in creative mode, with the allowlist off and Microsoft logins required. Its world, logs and settings stay out of git.
 
@@ -41,9 +37,7 @@ The server lives in `server/`. Start it with `server/start.sh` and the service w
    cd mod && JAVA_HOME=../.tools/jdk-25.0.5+8 ./gradlew build
    ```
 
-3. Install it in your game. In your launcher (Prism, Modrinth App, or the official one with the Fabric installer), make a **Minecraft 26.3 + Fabric Loader 0.19.5** profile. Drop these into its `mods/` folder:
-   - `mod/build/libs/mc-sionna-0.1.0.jar`
-   - [Fabric API](https://modrinth.com/mod/fabric-api) `0.163.0+26.3`
+3. Install it like any Fabric mod: Minecraft **26.3** + Fabric, with [Fabric API](https://modrinth.com/mod/fabric-api) and `mod/build/libs/mc-sionna-0.1.0.jar`.
 
 4. In a world (creative mode is easiest), find **Radio Transmitter** and **Radio Receiver** in the Functional Blocks tab, or run `/give @s mc_sionna:transmitter`. Place one of each. The simulation runs on its own each time a radio block is placed or broken. Run `/sionna run` to trace again after you change the world.
 
